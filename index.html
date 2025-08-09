@@ -47,45 +47,11 @@
             <p class="loader-subtext">Mapping the landscape of human feelings</p>
             <div class="loader-progress">
                 <div class="loader-progress-bar"></div>
-                <span class="loader-percentage">0%</span>
+                <span class="loader-percentage">Loading...</span>
             </div>
         </div>
     </div>
     
-    <!-- Welcome Modal (First Visit) -->
-    <div id="welcomeModal" class="modal-overlay" aria-hidden="true">
-        <div class="welcome-modal">
-            <div class="welcome-header">
-                <h1><i class="fas fa-brain"></i> Welcome to Emotion Dome</h1>
-                <p>Navigate the 3D architecture of human emotions</p>
-            </div>
-            <div class="welcome-content">
-                <div class="feature-grid">
-                    <div class="feature-item">
-                        <i class="fas fa-mouse-pointer"></i>
-                        <span>Click & drag to rotate</span>
-                    </div>
-                    <div class="feature-item">
-                        <i class="fas fa-search-plus"></i>
-                        <span>Scroll to zoom</span>
-                    </div>
-                    <div class="feature-item">
-                        <i class="fas fa-hand-point-up"></i>
-                        <span>Click nodes to explore</span>
-                    </div>
-                    <div class="feature-item">
-                        <i class="fas fa-keyboard"></i>
-                        <span>Use keyboard shortcuts</span>
-                    </div>
-                </div>
-                <button class="btn-start" id="startExperience">
-                    <span>Begin Exploration</span>
-                    <i class="fas fa-arrow-right"></i>
-                </button>
-            </div>
-        </div>
-    </div>
-
     <!-- Main Canvas -->
     <div id="canvas-container"></div>
     
@@ -319,32 +285,10 @@
         </div>
     </div>
 
-    <!-- Three.js and Dependencies -->
+    <!-- Three.js Core (Essential) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- OrbitControls for camera movement -->
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
-    
-    <!-- GSAP for Advanced Animations -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.4/gsap.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.4/CustomEase.min.js"></script>
-    
-    <!-- Howler.js for Sound -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/howler/2.2.4/howler.min.js"></script>
-    
-    <!-- Tippy.js for Tooltips -->
-    <script src="https://unpkg.com/@popperjs/core@2"></script>
-    <script src="https://unpkg.com/tippy.js@6"></script>
-    
-    <!-- Lodash for Utilities -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js"></script>
-    
-    <!-- Chart.js for Analytics -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
     <!-- Custom Scripts -->
     <script src="js/script.js"></script>
