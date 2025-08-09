@@ -1,29 +1,119 @@
 // =============================================
-// GEODESIC EMOTION DOME - MAIN SCRIPT
+// GEODESIC EMOTION DOME - ENHANCED MAIN SCRIPT
 // =============================================
 
-// Global Variables
-let scene, camera, renderer, controls, composer;
-let emotionNodes = [];
-let connections = [];
-let particles;
-let raycaster, mouse;
-let hoveredNode = null;
-let selectedNode = null;
-let selectedCategory = 'all';
-let settings = {
-    animationSpeed: 0.5,
-    connectionOpacity: 0.3,
-    nodeSize: 1,
-    showLabels: true,
-    autoRotate: true,
-    particleEffects: true,
-    soundEnabled: true
+// Performance monitoring
+const performanceMonitor = {
+    fps: 0,
+    frameCount: 0,
+    lastTime: performance.now(),
+    
+    update() {
+        this.frameCount++;
+        const currentTime = performance.now();
+        if (currentTime >= this.lastTime + 1000) {
+            this.fps = Math.round((this.frameCount * 1000) / (currentTime - this.lastTime));
+            this.frameCount = 0;
+            this.lastTime = currentTime;
+        }
+    }
 };
 
-// Emotion Data Structure
+// State Management System
+class StateManager {
+    constructor() {
+        this.state = {
+            isLoading: true,
+            isFirstVisit: this.checkFirstVisit(),
+            selectedCategory: 'all',
+            selectedNode: null,
+            hoveredNode: null,
+            searchQuery: '',
+            viewMode: '3d', // '3d', 'graph', 'analytics'
+            theme: 'dark',
+            emotionalJourney: [],
+            connectionStrength: new Map(),
+            nodeVisits: new Map()
+        };
+        
+        this.listeners = new Map();
+        this.history = [];
+        this.maxHistorySize = 50;
+    }
+    
+    checkFirstVisit() {
+        const visited = localStorage.getItem('emotionDomeVisited');
+        if (!visited) {
+            localStorage.setItem('emotionDomeVisited', 'true');
+            return true;
+        }
+        return false;
+    }
+    
+    setState(updates) {
+        const prevState = { ...this.state };
+        this.state = { ...this.state, ...updates };
+        this.history.push(prevState);
+        
+        if (this.history.length > this.maxHistorySize) {
+            this.history.shift();
+        }
+        
+        this.notifyListeners(updates);
+    }
+    
+    getState(key) {
+        return key ? this.state[key] : this.state;
+    }
+    
+    subscribe(key, callback) {
+        if (!this.listeners.has(key)) {
+            this.listeners.set(key, []);
+        }
+        this.listeners.get(key).push(callback);
+    }
+    
+    notifyListeners(updates) {
+        Object.keys(updates).forEach(key => {
+            if (this.listeners.has(key)) {
+                this.listeners.get(key).forEach(callback => callback(updates[key]));
+            }
+        });
+    }
+    
+    undo() {
+        if (this.history.length > 0) {
+            this.state = this.history.pop();
+            this.notifyListeners(this.state);
+        }
+    }
+    
+    saveToLocalStorage() {
+        const persistentState = {
+            theme: this.state.theme,
+            emotionalJourney: this.state.emotionalJourney,
+            nodeVisits: Array.from(this.state.nodeVisits.entries())
+        };
+        localStorage.setItem('emotionDomeState', JSON.stringify(persistentState));
+    }
+    
+    loadFromLocalStorage() {
+        const saved = localStorage.getItem('emotionDomeState');
+        if (saved) {
+            const data = JSON.parse(saved);
+            this.state.theme = data.theme || 'dark';
+            this.state.emotionalJourney = data.emotionalJourney || [];
+            this.state.nodeVisits = new Map(data.nodeVisits || []);
+        }
+    }
+}
+
+// Global state instance
+const stateManager = new StateManager();
+
+// Enhanced Emotion Data Structure with relationships and metadata
 const emotionsData = [
-    // Joy & Happiness
+    // Joy & Happiness Cluster
     { 
         id: 'joy', 
         name: 'Joy', 
@@ -31,7 +121,12 @@ const emotionsData = [
         color: '#FFD700',
         desc: 'Pure happiness and delight',
         connections: ['excitement', 'gratitude', 'love', 'hope'],
-        strength: 85
+        strength: 85,
+        valence: 0.9,
+        arousal: 0.7,
+        keywords: ['happy', 'cheerful', 'delighted', 'pleased'],
+        quote: 'Joy is the simplest form of gratitude',
+        position: null
     },
     { 
         id: 'excitement', 
@@ -40,7 +135,12 @@ const emotionsData = [
         color: '#FFA500',
         desc: 'Energetic anticipation and enthusiasm',
         connections: ['joy', 'hope', 'curiosity'],
-        strength: 75
+        strength: 75,
+        valence: 0.8,
+        arousal: 0.9,
+        keywords: ['thrilled', 'eager', 'enthusiastic', 'animated'],
+        quote: 'Excitement is the electricity of life',
+        position: null
     },
     { 
         id: 'gratitude', 
@@ -49,10 +149,15 @@ const emotionsData = [
         color: '#FFB347',
         desc: 'Thankfulness and appreciation',
         connections: ['joy', 'love', 'peace'],
-        strength: 80
+        strength: 80,
+        valence: 0.8,
+        arousal: 0.4,
+        keywords: ['thankful', 'appreciative', 'blessed', 'grateful'],
+        quote: 'Gratitude turns what we have into enough',
+        position: null
     },
     
-    // Love & Connection
+    // Love & Connection Cluster
     { 
         id: 'love', 
         name: 'Love', 
@@ -60,7 +165,12 @@ const emotionsData = [
         color: '#FF69B4',
         desc: 'Deep affection and connection',
         connections: ['joy', 'compassion', 'trust', 'gratitude'],
-        strength: 90
+        strength: 90,
+        valence: 0.9,
+        arousal: 0.5,
+        keywords: ['affection', 'caring', 'devotion', 'warmth'],
+        quote: 'Love is the bridge between souls',
+        position: null
     },
     { 
         id: 'compassion', 
@@ -69,7 +179,12 @@ const emotionsData = [
         color: '#FF1493',
         desc: 'Empathy and concern for others',
         connections: ['love', 'sadness', 'hope'],
-        strength: 70
+        strength: 70,
+        valence: 0.6,
+        arousal: 0.3,
+        keywords: ['empathy', 'kindness', 'sympathy', 'understanding'],
+        quote: 'Compassion is love in action',
+        position: null
     },
     { 
         id: 'trust', 
@@ -78,10 +193,15 @@ const emotionsData = [
         color: '#C71585',
         desc: 'Faith and confidence in others',
         connections: ['love', 'peace', 'hope'],
-        strength: 75
+        strength: 75,
+        valence: 0.7,
+        arousal: 0.2,
+        keywords: ['faith', 'confidence', 'reliability', 'security'],
+        quote: 'Trust is the foundation of connection',
+        position: null
     },
     
-    // Sadness & Melancholy
+    // Sadness & Melancholy Cluster
     { 
         id: 'sadness', 
         name: 'Sadness', 
@@ -89,7 +209,12 @@ const emotionsData = [
         color: '#4169E1',
         desc: 'Sorrow and unhappiness',
         connections: ['grief', 'loneliness', 'compassion', 'nostalgia'],
-        strength: 60
+        strength: 60,
+        valence: -0.6,
+        arousal: -0.3,
+        keywords: ['sorrowful', 'unhappy', 'melancholy', 'blue'],
+        quote: 'Sadness is love with nowhere to go',
+        position: null
     },
     { 
         id: 'grief', 
@@ -98,7 +223,12 @@ const emotionsData = [
         color: '#191970',
         desc: 'Deep sorrow from loss',
         connections: ['sadness', 'anger', 'loneliness'],
-        strength: 45
+        strength: 45,
+        valence: -0.8,
+        arousal: -0.5,
+        keywords: ['mourning', 'loss', 'bereavement', 'anguish'],
+        quote: 'Grief is love persevering',
+        position: null
     },
     { 
         id: 'loneliness', 
@@ -107,7 +237,12 @@ const emotionsData = [
         color: '#6495ED',
         desc: 'Isolation and disconnection',
         connections: ['sadness', 'fear', 'grief'],
-        strength: 50
+        strength: 50,
+        valence: -0.7,
+        arousal: -0.4,
+        keywords: ['isolated', 'alone', 'disconnected', 'abandoned'],
+        quote: 'Loneliness is the human condition',
+        position: null
     },
     { 
         id: 'nostalgia', 
@@ -116,10 +251,15 @@ const emotionsData = [
         color: '#4682B4',
         desc: 'Bittersweet longing for the past',
         connections: ['sadness', 'joy', 'peace'],
-        strength: 65
+        strength: 65,
+        valence: 0.1,
+        arousal: -0.2,
+        keywords: ['wistful', 'reminiscent', 'yearning', 'sentimental'],
+        quote: 'Nostalgia is memory with the pain removed',
+        position: null
     },
     
-    // Anger & Frustration
+    // Anger & Frustration Cluster
     { 
         id: 'anger', 
         name: 'Anger', 
@@ -127,7 +267,12 @@ const emotionsData = [
         color: '#DC143C',
         desc: 'Strong displeasure and hostility',
         connections: ['frustration', 'fear', 'grief'],
-        strength: 70
+        strength: 70,
+        valence: -0.7,
+        arousal: 0.8,
+        keywords: ['furious', 'enraged', 'irritated', 'mad'],
+        quote: 'Anger is sadness that had nowhere to go for too long',
+        position: null
     },
     { 
         id: 'frustration', 
@@ -136,7 +281,12 @@ const emotionsData = [
         color: '#B22222',
         desc: 'Feeling blocked or thwarted',
         connections: ['anger', 'anxiety', 'determination'],
-        strength: 65
+        strength: 65,
+        valence: -0.5,
+        arousal: 0.6,
+        keywords: ['annoyed', 'exasperated', 'impatient', 'thwarted'],
+        quote: 'Frustration is the first step towards improvement',
+        position: null
     },
     { 
         id: 'jealousy', 
@@ -145,10 +295,15 @@ const emotionsData = [
         color: '#8B0000',
         desc: 'Envy and resentment',
         connections: ['anger', 'fear', 'sadness'],
-        strength: 55
+        strength: 55,
+        valence: -0.6,
+        arousal: 0.5,
+        keywords: ['envious', 'resentful', 'covetous', 'suspicious'],
+        quote: 'Jealousy is the art of counting others\' blessings',
+        position: null
     },
     
-    // Fear & Anxiety
+    // Fear & Anxiety Cluster
     { 
         id: 'fear', 
         name: 'Fear', 
@@ -156,7 +311,12 @@ const emotionsData = [
         color: '#8B008B',
         desc: 'Apprehension of danger',
         connections: ['anxiety', 'anger', 'loneliness'],
-        strength: 60
+        strength: 60,
+        valence: -0.8,
+        arousal: 0.7,
+        keywords: ['afraid', 'scared', 'terrified', 'fearful'],
+        quote: 'Fear is excitement without breath',
+        position: null
     },
     { 
         id: 'anxiety', 
@@ -165,7 +325,12 @@ const emotionsData = [
         color: '#9932CC',
         desc: 'Worry about future uncertainty',
         connections: ['fear', 'frustration', 'overwhelm'],
-        strength: 65
+        strength: 65,
+        valence: -0.6,
+        arousal: 0.6,
+        keywords: ['worried', 'nervous', 'uneasy', 'tense'],
+        quote: 'Anxiety is the dizziness of freedom',
+        position: null
     },
     { 
         id: 'overwhelm', 
@@ -174,10 +339,15 @@ const emotionsData = [
         color: '#9370DB',
         desc: 'Feeling unable to cope',
         connections: ['anxiety', 'sadness', 'frustration'],
-        strength: 55
+        strength: 55,
+        valence: -0.7,
+        arousal: 0.4,
+        keywords: ['overloaded', 'swamped', 'stressed', 'burdened'],
+        quote: 'When overwhelmed, return to breath',
+        position: null
     },
     
-    // Calm & Peace
+    // Calm & Peace Cluster
     { 
         id: 'peace', 
         name: 'Peace', 
@@ -185,7 +355,12 @@ const emotionsData = [
         color: '#20B2AA',
         desc: 'Tranquility and serenity',
         connections: ['trust', 'gratitude', 'acceptance'],
-        strength: 80
+        strength: 80,
+        valence: 0.7,
+        arousal: -0.5,
+        keywords: ['tranquil', 'serene', 'calm', 'relaxed'],
+        quote: 'Peace begins with a smile',
+        position: null
     },
     { 
         id: 'acceptance', 
@@ -194,7 +369,12 @@ const emotionsData = [
         color: '#48D1CC',
         desc: 'Embracing what is',
         connections: ['peace', 'trust', 'hope'],
-        strength: 75
+        strength: 75,
+        valence: 0.5,
+        arousal: -0.3,
+        keywords: ['accepting', 'allowing', 'embracing', 'surrendering'],
+        quote: 'Acceptance is the first step to change',
+        position: null
     },
     { 
         id: 'hope', 
@@ -203,7 +383,12 @@ const emotionsData = [
         color: '#00CED1',
         desc: 'Optimism for the future',
         connections: ['joy', 'trust', 'excitement', 'compassion'],
-        strength: 85
+        strength: 85,
+        valence: 0.8,
+        arousal: 0.3,
+        keywords: ['optimistic', 'hopeful', 'confident', 'positive'],
+        quote: 'Hope is the thing with feathers',
+        position: null
     },
     { 
         id: 'curiosity', 
@@ -212,7 +397,12 @@ const emotionsData = [
         color: '#5F9EA0',
         desc: 'Wonder and desire to explore',
         connections: ['excitement', 'hope', 'joy'],
-        strength: 70
+        strength: 70,
+        valence: 0.6,
+        arousal: 0.4,
+        keywords: ['interested', 'inquisitive', 'wondering', 'exploring'],
+        quote: 'Curiosity is the wick in the candle of learning',
+        position: null
     },
     { 
         id: 'determination', 
@@ -221,7 +411,12 @@ const emotionsData = [
         color: '#008B8B',
         desc: 'Resolve and persistence',
         connections: ['hope', 'frustration', 'courage'],
-        strength: 80
+        strength: 80,
+        valence: 0.4,
+        arousal: 0.5,
+        keywords: ['determined', 'persistent', 'resolute', 'committed'],
+        quote: 'Determination is the wake-up call to the human will',
+        position: null
     },
     { 
         id: 'courage', 
@@ -230,7 +425,12 @@ const emotionsData = [
         color: '#006666',
         desc: 'Bravery in facing challenges',
         connections: ['determination', 'fear', 'hope'],
-        strength: 85
+        strength: 85,
+        valence: 0.6,
+        arousal: 0.6,
+        keywords: ['brave', 'bold', 'fearless', 'valiant'],
+        quote: 'Courage is fear walking',
+        position: null
     }
 ];
 
@@ -935,30 +1135,341 @@ function initUIControls() {
     });
 }
 
-// Initialize application
-function init() {
-    // Initialize scene
-    initScene();
+// Initialize application with enhanced error handling
+async function init() {
+    try {
+        // Show welcome modal for first-time visitors
+        if (stateManager.getState('isFirstVisit')) {
+            showWelcomeModal();
+        }
+        
+        // Load saved state
+        stateManager.loadFromLocalStorage();
+        
+        // Initialize Three.js scene
+        await initScene();
+        
+        // Create dome structure
+        await createGeodesicDome();
+        
+        // Initialize UI controls
+        initUIControls();
+        
+        // Setup keyboard shortcuts
+        setupKeyboardShortcuts();
+        
+        // Setup search functionality
+        setupSearch();
+        
+        // Initialize tooltips
+        initTooltips();
+        
+        // Event listeners
+        setupEventListeners();
+        
+        // Start performance monitoring
+        if (settings.showPerformance) {
+            startPerformanceMonitoring();
+        }
+        
+        // Hide loader with animation
+        hideLoader();
+        
+        // Start animation loop
+        animate();
+        
+        // Play ambient sound if enabled
+        if (settings.soundEnabled) {
+            soundManager.toggleAmbient(true);
+        }
+        
+        // Analytics
+        trackEvent('app_initialized', {
+            nodes: emotionNodes.length,
+            connections: connections.length
+        });
+        
+    } catch (error) {
+        console.error('Failed to initialize application:', error);
+        showErrorMessage('Failed to load the Emotion Dome. Please refresh the page.');
+    }
+}
+
+// Enhanced keyboard shortcuts
+function setupKeyboardShortcuts() {
+    const shortcuts = {
+        'Escape': () => {
+            stateManager.setState({ selectedNode: null });
+            resetView();
+        },
+        'Space': (e) => {
+            e.preventDefault();
+            settings.autoRotate = !settings.autoRotate;
+            controls.autoRotate = settings.autoRotate;
+        },
+        'KeyF': (e) => {
+            if (!e.ctrlKey && !e.metaKey) {
+                toggleFullscreen();
+            }
+        },
+        'KeyS': () => {
+            settings.soundEnabled = !settings.soundEnabled;
+            updateSoundButton();
+        },
+        'KeyH': () => {
+            showHelp();
+        },
+        'KeyR': () => {
+            resetView();
+        },
+        'Slash': (e) => {
+            e.preventDefault();
+            document.getElementById('emotionSearch').focus();
+        },
+        'ArrowLeft': () => navigateCategory(-1),
+        'ArrowRight': () => navigateCategory(1),
+        'KeyZ': (e) => {
+            if (e.ctrlKey || e.metaKey) {
+                e.preventDefault();
+                stateManager.undo();
+            }
+        },
+        'Digit1': () => filterByCategory('all'),
+        'Digit2': () => filterByCategory('joy'),
+        'Digit3': () => filterByCategory('love'),
+        'Digit4': () => filterByCategory('sadness'),
+        'Digit5': () => filterByCategory('anger'),
+        'Digit6': () => filterByCategory('fear'),
+        'Digit7': () => filterByCategory('calm')
+    };
     
-    // Create dome structure
-    createGeodesicDome();
+    document.addEventListener('keydown', (e) => {
+        if (shortcuts[e.code]) {
+            shortcuts[e.code](e);
+        }
+    });
+}
+
+// Navigate between categories with keyboard
+function navigateCategory(direction) {
+    const categories = ['all', 'joy', 'love', 'sadness', 'anger', 'fear', 'calm'];
+    const currentIndex = categories.indexOf(stateManager.getState('selectedCategory'));
+    const newIndex = (currentIndex + direction + categories.length) % categories.length;
+    filterByCategory(categories[newIndex]);
+}
+
+// Enhanced search functionality
+function setupSearch() {
+    const searchInput = document.getElementById('emotionSearch');
+    let searchTimeout;
     
-    // Initialize UI controls
-    initUIControls();
+    searchInput.addEventListener('input', (e) => {
+        clearTimeout(searchTimeout);
+        const query = e.target.value.toLowerCase();
+        
+        searchTimeout = setTimeout(() => {
+            performSearch(query);
+        }, 300); // Debounce search
+    });
     
-    // Event listeners
-    window.addEventListener('resize', onWindowResize);
-    window.addEventListener('mousemove', onMouseMove);
-    window.addEventListener('click', onMouseClick);
+    searchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            const results = performSearch(searchInput.value.toLowerCase());
+            if (results.length > 0) {
+                focusOnNode(results[0]);
+            }
+        }
+    });
+}
+
+// Perform emotion search
+function performSearch(query) {
+    stateManager.setState({ searchQuery: query });
     
-    // Hide loader
+    if (!query) {
+        // Reset all nodes visibility
+        emotionNodes.forEach(node => {
+            gsap.to(node.sphere.material, {
+                opacity: 1,
+                duration: 0.3
+            });
+        });
+        return [];
+    }
+    
+    const results = [];
+    
+    emotionNodes.forEach(node => {
+        const emotion = node.emotion;
+        const match = 
+            emotion.name.toLowerCase().includes(query) ||
+            emotion.desc.toLowerCase().includes(query) ||
+            emotion.keywords.some(k => k.includes(query)) ||
+            emotion.category.includes(query);
+        
+        if (match) {
+            results.push(node);
+            gsap.to(node.sphere.material, {
+                opacity: 1,
+                duration: 0.3
+            });
+            // Pulse effect for matches
+            gsap.to(node.group.scale, {
+                x: 1.2,
+                y: 1.2,
+                z: 1.2,
+                duration: 0.5,
+                yoyo: true,
+                repeat: 1
+            });
+        } else {
+            gsap.to(node.sphere.material, {
+                opacity: 0.2,
+                duration: 0.3
+            });
+        }
+    });
+    
+    updateSearchResults(results);
+    return results;
+}
+
+// Update search results display
+function updateSearchResults(results) {
+    const resultsContainer = document.getElementById('searchResults');
+    if (!resultsContainer) return;
+    
+    if (results.length === 0 && stateManager.getState('searchQuery')) {
+        resultsContainer.innerHTML = '<p class="no-results">No emotions found</p>';
+    } else if (results.length > 0) {
+        resultsContainer.innerHTML = `
+            <p class="results-count">${results.length} emotion${results.length > 1 ? 's' : ''} found</p>
+            <div class="results-list">
+                ${results.map(node => `
+                    <div class="result-item" data-id="${node.emotion.id}">
+                        <span class="result-name">${node.emotion.name}</span>
+                        <span class="result-category">${node.emotion.category}</span>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+        
+        // Add click handlers to results
+        resultsContainer.querySelectorAll('.result-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const nodeId = item.dataset.id;
+                const node = emotionNodes.find(n => n.emotion.id === nodeId);
+                if (node) focusOnNode(node);
+            });
+        });
+    } else {
+        resultsContainer.innerHTML = '';
+    }
+}
+
+// Initialize tooltips using Tippy.js
+function initTooltips() {
+    // Category tooltips
+    tippy('.emotion-category', {
+        content: (element) => {
+            const category = element.dataset.category;
+            const count = element.querySelector('.category-count').textContent;
+            return `Click to filter by ${category} emotions (${count})`;
+        },
+        placement: 'right',
+        theme: 'light'
+    });
+    
+    // Control button tooltips
+    tippy('#toggleSound', {
+        content: 'Toggle sound (S)',
+        placement: 'bottom'
+    });
+    
+    tippy('#toggleFullscreen', {
+        content: 'Fullscreen (F)',
+        placement: 'bottom'
+    });
+    
+    tippy('#toggleSettings', {
+        content: 'Settings',
+        placement: 'bottom'
+    });
+    
+    tippy('#resetView', {
+        content: 'Reset view (R)',
+        placement: 'top'
+    });
+}
+
+// Enhanced loader hiding with progress animation
+function hideLoader() {
+    const loader = document.getElementById('loader');
+    const progressBar = loader.querySelector('.loader-progress-bar');
+    const percentage = loader.querySelector('.loader-percentage');
+    
+    // Animate progress to 100%
+    gsap.to(progressBar, {
+        width: '100%',
+        duration: 1,
+        ease: 'power2.out',
+        onUpdate: function() {
+            const progress = Math.round(this.progress() * 100);
+            if (percentage) {
+                percentage.textContent = `${progress}%`;
+            }
+        },
+        onComplete: () => {
+            // Fade out loader
+            gsap.to(loader, {
+                opacity: 0,
+                duration: 0.5,
+                onComplete: () => {
+                    loader.classList.add('hidden');
+                    stateManager.setState({ isLoading: false });
+                }
+            });
+        }
+    });
+}
+
+// Show welcome modal
+function showWelcomeModal() {
+    const modal = document.getElementById('welcomeModal');
+    if (!modal) return;
+    
+    modal.classList.add('active');
+    
+    document.getElementById('startExperience').addEventListener('click', () => {
+        modal.classList.remove('active');
+        trackEvent('welcome_completed');
+    });
+}
+
+// Analytics tracking
+function trackEvent(eventName, data = {}) {
+    // Implement your analytics tracking here
+    console.log('Track event:', eventName, data);
+    
+    // Example: Google Analytics
+    if (typeof gtag !== 'undefined') {
+        gtag('event', eventName, data);
+    }
+}
+
+// Error handling
+function showErrorMessage(message) {
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'error-message';
+    errorDiv.innerHTML = `
+        <i class="fas fa-exclamation-triangle"></i>
+        <span>${message}</span>
+    `;
+    document.body.appendChild(errorDiv);
+    
     setTimeout(() => {
-        document.getElementById('loader').classList.add('hidden');
-        soundManager.toggleAmbient(settings.soundEnabled);
-    }, 2000);
-    
-    // Start animation
-    animate();
+        errorDiv.remove();
+    }, 5000);
 }
 
 // Start application when DOM is loaded
