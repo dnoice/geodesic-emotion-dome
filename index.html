@@ -3,30 +3,85 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Explore the interconnected architecture of human emotions through an interactive 3D geodesic visualization">
+    <meta name="keywords" content="emotions, psychology, 3D visualization, interactive, geodesic dome, mental health">
+    <meta name="author" content="Emotion Dome">
+    
+    <!-- Open Graph / Social Media -->
+    <meta property="og:title" content="Geodesic Emotion Dome - 3D Emotional Architecture">
+    <meta property="og:description" content="Explore the interconnected architecture of human emotions">
+    <meta property="og:type" content="website">
+    
     <title>Geodesic Emotion Dome - Interactive 3D Emotional Architecture</title>
     
-    <!-- Font Awesome -->
+    <!-- Preconnect for Performance -->
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    
+    <!-- Font Awesome Pro -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     
     <!-- Google Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
     
     <!-- Animate.css -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css">
+    
+    <!-- Tippy.js for Tooltips -->
+    <link rel="stylesheet" href="https://unpkg.com/tippy.js@6/dist/tippy.css">
+    <link rel="stylesheet" href="https://unpkg.com/tippy.js@6/themes/light.css">
     
     <!-- Custom Styles -->
     <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
     <!-- Loading Screen -->
-    <div id="loader" class="loader-container">
+    <div id="loader" class="loader-container" role="status" aria-live="polite">
         <div class="loader-content">
-            <div class="loader-sphere"></div>
+            <div class="loader-sphere">
+                <div class="loader-sphere-inner"></div>
+                <div class="loader-sphere-glow"></div>
+            </div>
             <h2 class="loader-text">Building Emotional Architecture</h2>
+            <p class="loader-subtext">Mapping the landscape of human feelings</p>
             <div class="loader-progress">
                 <div class="loader-progress-bar"></div>
+                <span class="loader-percentage">0%</span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Welcome Modal (First Visit) -->
+    <div id="welcomeModal" class="modal-overlay" aria-hidden="true">
+        <div class="welcome-modal">
+            <div class="welcome-header">
+                <h1><i class="fas fa-brain"></i> Welcome to Emotion Dome</h1>
+                <p>Navigate the 3D architecture of human emotions</p>
+            </div>
+            <div class="welcome-content">
+                <div class="feature-grid">
+                    <div class="feature-item">
+                        <i class="fas fa-mouse-pointer"></i>
+                        <span>Click & drag to rotate</span>
+                    </div>
+                    <div class="feature-item">
+                        <i class="fas fa-search-plus"></i>
+                        <span>Scroll to zoom</span>
+                    </div>
+                    <div class="feature-item">
+                        <i class="fas fa-hand-point-up"></i>
+                        <span>Click nodes to explore</span>
+                    </div>
+                    <div class="feature-item">
+                        <i class="fas fa-keyboard"></i>
+                        <span>Use keyboard shortcuts</span>
+                    </div>
+                </div>
+                <button class="btn-start" id="startExperience">
+                    <span>Begin Exploration</span>
+                    <i class="fas fa-arrow-right"></i>
+                </button>
             </div>
         </div>
     </div>
@@ -54,14 +109,20 @@
     </header>
     
     <!-- Side Panel - Categories -->
-    <aside class="side-panel animate__animated animate__fadeInLeft">
-        <h2 class="panel-title">
-            <i class="fas fa-heart"></i>
-            Emotion Categories
-        </h2>
+    <aside class="side-panel animate__animated animate__fadeInLeft" role="navigation" aria-label="Emotion Categories">
+        <div class="panel-header">
+            <h2 class="panel-title">
+                <i class="fas fa-heart"></i>
+                <span>Emotion Categories</span>
+            </h2>
+            <div class="search-box">
+                <i class="fas fa-search"></i>
+                <input type="text" id="emotionSearch" placeholder="Search emotions..." aria-label="Search emotions">
+            </div>
+        </div>
         
-        <div class="categories-container">
-            <div class="emotion-category" data-category="all">
+        <div class="categories-container" id="categoriesContainer">
+            <div class="emotion-category active" data-category="all" tabindex="0" role="button" aria-pressed="true">
                 <div class="category-icon">
                     <i class="fas fa-infinity"></i>
                 </div>
@@ -69,9 +130,10 @@
                     <span class="category-name">All Emotions</span>
                     <span class="category-count">22 nodes</span>
                 </div>
+                <div class="category-badge">ALL</div>
             </div>
             
-            <div class="emotion-category" data-category="joy" data-color="#FFD700">
+            <div class="emotion-category" data-category="joy" data-color="#FFD700" tabindex="0" role="button" aria-pressed="false">
                 <div class="category-icon" style="background: linear-gradient(135deg, #FFD700, #FFA500);">
                     <i class="fas fa-sun"></i>
                 </div>
@@ -79,6 +141,7 @@
                     <span class="category-name">Joy & Happiness</span>
                     <span class="category-count">3 nodes</span>
                 </div>
+                <div class="category-badge">JOY</div>
             </div>
             
             <div class="emotion-category" data-category="love" data-color="#FF69B4">
@@ -268,9 +331,20 @@
     
     <!-- GSAP for Advanced Animations -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.4/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.4/CustomEase.min.js"></script>
     
     <!-- Howler.js for Sound -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/howler/2.2.4/howler.min.js"></script>
+    
+    <!-- Tippy.js for Tooltips -->
+    <script src="https://unpkg.com/@popperjs/core@2"></script>
+    <script src="https://unpkg.com/tippy.js@6"></script>
+    
+    <!-- Lodash for Utilities -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js"></script>
+    
+    <!-- Chart.js for Analytics -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
     <!-- Custom Scripts -->
     <script src="js/script.js"></script>
