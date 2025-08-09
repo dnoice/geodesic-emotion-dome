@@ -1,117 +1,38 @@
 // =============================================
-// GEODESIC EMOTION DOME - ENHANCED MAIN SCRIPT
+// GEODESIC EMOTION DOME - MAIN SCRIPT (FIXED)
 // =============================================
 
-// Performance monitoring
-const performanceMonitor = {
-    fps: 0,
-    frameCount: 0,
-    lastTime: performance.now(),
-    
-    update() {
-        this.frameCount++;
-        const currentTime = performance.now();
-        if (currentTime >= this.lastTime + 1000) {
-            this.fps = Math.round((this.frameCount * 1000) / (currentTime - this.lastTime));
-            this.frameCount = 0;
-            this.lastTime = currentTime;
-        }
-    }
+// Global Variables - Properly declared
+let scene, camera, renderer, controls, composer;
+let emotionNodes = [];
+let connections = [];
+let particles = null;
+let raycaster, mouse;
+let nodeGroup, connectionGroup;
+
+// Settings object
+const settings = {
+    animationSpeed: 0.5,
+    connectionOpacity: 0.3,
+    nodeSize: 1,
+    showLabels: true,
+    autoRotate: true,
+    particleEffects: true,
+    soundEnabled: false, // Start with sound disabled
+    showPerformance: false
 };
 
-// State Management System
-class StateManager {
-    constructor() {
-        this.state = {
-            isLoading: true,
-            isFirstVisit: this.checkFirstVisit(),
-            selectedCategory: 'all',
-            selectedNode: null,
-            hoveredNode: null,
-            searchQuery: '',
-            viewMode: '3d', // '3d', 'graph', 'analytics'
-            theme: 'dark',
-            emotionalJourney: [],
-            connectionStrength: new Map(),
-            nodeVisits: new Map()
-        };
-        
-        this.listeners = new Map();
-        this.history = [];
-        this.maxHistorySize = 50;
-    }
-    
-    checkFirstVisit() {
-        const visited = localStorage.getItem('emotionDomeVisited');
-        if (!visited) {
-            localStorage.setItem('emotionDomeVisited', 'true');
-            return true;
-        }
-        return false;
-    }
-    
-    setState(updates) {
-        const prevState = { ...this.state };
-        this.state = { ...this.state, ...updates };
-        this.history.push(prevState);
-        
-        if (this.history.length > this.maxHistorySize) {
-            this.history.shift();
-        }
-        
-        this.notifyListeners(updates);
-    }
-    
-    getState(key) {
-        return key ? this.state[key] : this.state;
-    }
-    
-    subscribe(key, callback) {
-        if (!this.listeners.has(key)) {
-            this.listeners.set(key, []);
-        }
-        this.listeners.get(key).push(callback);
-    }
-    
-    notifyListeners(updates) {
-        Object.keys(updates).forEach(key => {
-            if (this.listeners.has(key)) {
-                this.listeners.get(key).forEach(callback => callback(updates[key]));
-            }
-        });
-    }
-    
-    undo() {
-        if (this.history.length > 0) {
-            this.state = this.history.pop();
-            this.notifyListeners(this.state);
-        }
-    }
-    
-    saveToLocalStorage() {
-        const persistentState = {
-            theme: this.state.theme,
-            emotionalJourney: this.state.emotionalJourney,
-            nodeVisits: Array.from(this.state.nodeVisits.entries())
-        };
-        localStorage.setItem('emotionDomeState', JSON.stringify(persistentState));
-    }
-    
-    loadFromLocalStorage() {
-        const saved = localStorage.getItem('emotionDomeState');
-        if (saved) {
-            const data = JSON.parse(saved);
-            this.state.theme = data.theme || 'dark';
-            this.state.emotionalJourney = data.emotionalJourney || [];
-            this.state.nodeVisits = new Map(data.nodeVisits || []);
-        }
-    }
-}
+// Simple State Management (simplified for reliability)
+const appState = {
+    isLoading: true,
+    isFirstVisit: false,
+    selectedCategory: 'all',
+    selectedNode: null,
+    hoveredNode: null,
+    searchQuery: ''
+};
 
-// Global state instance
-const stateManager = new StateManager();
-
-// Enhanced Emotion Data Structure with relationships and metadata
+// Enhanced Emotion Data Structure
 const emotionsData = [
     // Joy & Happiness Cluster
     { 
@@ -125,8 +46,7 @@ const emotionsData = [
         valence: 0.9,
         arousal: 0.7,
         keywords: ['happy', 'cheerful', 'delighted', 'pleased'],
-        quote: 'Joy is the simplest form of gratitude',
-        position: null
+        quote: 'Joy is the simplest form of gratitude'
     },
     { 
         id: 'excitement', 
@@ -139,8 +59,7 @@ const emotionsData = [
         valence: 0.8,
         arousal: 0.9,
         keywords: ['thrilled', 'eager', 'enthusiastic', 'animated'],
-        quote: 'Excitement is the electricity of life',
-        position: null
+        quote: 'Excitement is the electricity of life'
     },
     { 
         id: 'gratitude', 
@@ -153,8 +72,7 @@ const emotionsData = [
         valence: 0.8,
         arousal: 0.4,
         keywords: ['thankful', 'appreciative', 'blessed', 'grateful'],
-        quote: 'Gratitude turns what we have into enough',
-        position: null
+        quote: 'Gratitude turns what we have into enough'
     },
     
     // Love & Connection Cluster
@@ -169,8 +87,7 @@ const emotionsData = [
         valence: 0.9,
         arousal: 0.5,
         keywords: ['affection', 'caring', 'devotion', 'warmth'],
-        quote: 'Love is the bridge between souls',
-        position: null
+        quote: 'Love is the bridge between souls'
     },
     { 
         id: 'compassion', 
@@ -183,8 +100,7 @@ const emotionsData = [
         valence: 0.6,
         arousal: 0.3,
         keywords: ['empathy', 'kindness', 'sympathy', 'understanding'],
-        quote: 'Compassion is love in action',
-        position: null
+        quote: 'Compassion is love in action'
     },
     { 
         id: 'trust', 
@@ -197,8 +113,7 @@ const emotionsData = [
         valence: 0.7,
         arousal: 0.2,
         keywords: ['faith', 'confidence', 'reliability', 'security'],
-        quote: 'Trust is the foundation of connection',
-        position: null
+        quote: 'Trust is the foundation of connection'
     },
     
     // Sadness & Melancholy Cluster
@@ -213,8 +128,7 @@ const emotionsData = [
         valence: -0.6,
         arousal: -0.3,
         keywords: ['sorrowful', 'unhappy', 'melancholy', 'blue'],
-        quote: 'Sadness is love with nowhere to go',
-        position: null
+        quote: 'Sadness is love with nowhere to go'
     },
     { 
         id: 'grief', 
@@ -227,8 +141,7 @@ const emotionsData = [
         valence: -0.8,
         arousal: -0.5,
         keywords: ['mourning', 'loss', 'bereavement', 'anguish'],
-        quote: 'Grief is love persevering',
-        position: null
+        quote: 'Grief is love persevering'
     },
     { 
         id: 'loneliness', 
@@ -241,8 +154,7 @@ const emotionsData = [
         valence: -0.7,
         arousal: -0.4,
         keywords: ['isolated', 'alone', 'disconnected', 'abandoned'],
-        quote: 'Loneliness is the human condition',
-        position: null
+        quote: 'Loneliness is the human condition'
     },
     { 
         id: 'nostalgia', 
@@ -255,8 +167,7 @@ const emotionsData = [
         valence: 0.1,
         arousal: -0.2,
         keywords: ['wistful', 'reminiscent', 'yearning', 'sentimental'],
-        quote: 'Nostalgia is memory with the pain removed',
-        position: null
+        quote: 'Nostalgia is memory with the pain removed'
     },
     
     // Anger & Frustration Cluster
@@ -271,8 +182,7 @@ const emotionsData = [
         valence: -0.7,
         arousal: 0.8,
         keywords: ['furious', 'enraged', 'irritated', 'mad'],
-        quote: 'Anger is sadness that had nowhere to go for too long',
-        position: null
+        quote: 'Anger is sadness that had nowhere to go for too long'
     },
     { 
         id: 'frustration', 
@@ -285,8 +195,7 @@ const emotionsData = [
         valence: -0.5,
         arousal: 0.6,
         keywords: ['annoyed', 'exasperated', 'impatient', 'thwarted'],
-        quote: 'Frustration is the first step towards improvement',
-        position: null
+        quote: 'Frustration is the first step towards improvement'
     },
     { 
         id: 'jealousy', 
@@ -299,8 +208,7 @@ const emotionsData = [
         valence: -0.6,
         arousal: 0.5,
         keywords: ['envious', 'resentful', 'covetous', 'suspicious'],
-        quote: 'Jealousy is the art of counting others\' blessings',
-        position: null
+        quote: 'Jealousy is the art of counting others\' blessings'
     },
     
     // Fear & Anxiety Cluster
@@ -315,8 +223,7 @@ const emotionsData = [
         valence: -0.8,
         arousal: 0.7,
         keywords: ['afraid', 'scared', 'terrified', 'fearful'],
-        quote: 'Fear is excitement without breath',
-        position: null
+        quote: 'Fear is excitement without breath'
     },
     { 
         id: 'anxiety', 
@@ -329,8 +236,7 @@ const emotionsData = [
         valence: -0.6,
         arousal: 0.6,
         keywords: ['worried', 'nervous', 'uneasy', 'tense'],
-        quote: 'Anxiety is the dizziness of freedom',
-        position: null
+        quote: 'Anxiety is the dizziness of freedom'
     },
     { 
         id: 'overwhelm', 
@@ -343,8 +249,7 @@ const emotionsData = [
         valence: -0.7,
         arousal: 0.4,
         keywords: ['overloaded', 'swamped', 'stressed', 'burdened'],
-        quote: 'When overwhelmed, return to breath',
-        position: null
+        quote: 'When overwhelmed, return to breath'
     },
     
     // Calm & Peace Cluster
@@ -359,8 +264,7 @@ const emotionsData = [
         valence: 0.7,
         arousal: -0.5,
         keywords: ['tranquil', 'serene', 'calm', 'relaxed'],
-        quote: 'Peace begins with a smile',
-        position: null
+        quote: 'Peace begins with a smile'
     },
     { 
         id: 'acceptance', 
@@ -373,8 +277,7 @@ const emotionsData = [
         valence: 0.5,
         arousal: -0.3,
         keywords: ['accepting', 'allowing', 'embracing', 'surrendering'],
-        quote: 'Acceptance is the first step to change',
-        position: null
+        quote: 'Acceptance is the first step to change'
     },
     { 
         id: 'hope', 
@@ -387,8 +290,7 @@ const emotionsData = [
         valence: 0.8,
         arousal: 0.3,
         keywords: ['optimistic', 'hopeful', 'confident', 'positive'],
-        quote: 'Hope is the thing with feathers',
-        position: null
+        quote: 'Hope is the thing with feathers'
     },
     { 
         id: 'curiosity', 
@@ -401,8 +303,7 @@ const emotionsData = [
         valence: 0.6,
         arousal: 0.4,
         keywords: ['interested', 'inquisitive', 'wondering', 'exploring'],
-        quote: 'Curiosity is the wick in the candle of learning',
-        position: null
+        quote: 'Curiosity is the wick in the candle of learning'
     },
     { 
         id: 'determination', 
@@ -415,8 +316,7 @@ const emotionsData = [
         valence: 0.4,
         arousal: 0.5,
         keywords: ['determined', 'persistent', 'resolute', 'committed'],
-        quote: 'Determination is the wake-up call to the human will',
-        position: null
+        quote: 'Determination is the wake-up call to the human will'
     },
     { 
         id: 'courage', 
@@ -429,52 +329,14 @@ const emotionsData = [
         valence: 0.6,
         arousal: 0.6,
         keywords: ['brave', 'bold', 'fearless', 'valiant'],
-        quote: 'Courage is fear walking',
-        position: null
+        quote: 'Courage is fear walking'
     }
 ];
 
-// Sound Manager (using Howler.js)
-class SoundManager {
-    constructor() {
-        this.sounds = {
-            hover: new Howl({
-                src: ['data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSl+0fPTgjMGHm7A7+OZURE...'],
-                volume: 0.3
-            }),
-            click: new Howl({
-                src: ['data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSl+0fPTgjMGHm7A7+OZURE...'],
-                volume: 0.5
-            }),
-            ambient: new Howl({
-                src: ['data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSl+0fPTgjMGHm7A7+OZURE...'],
-                volume: 0.1,
-                loop: true
-            })
-        };
-    }
-    
-    playHover() {
-        if (settings.soundEnabled) this.sounds.hover.play();
-    }
-    
-    playClick() {
-        if (settings.soundEnabled) this.sounds.click.play();
-    }
-    
-    toggleAmbient(enabled) {
-        if (enabled) {
-            this.sounds.ambient.play();
-        } else {
-            this.sounds.ambient.stop();
-        }
-    }
-}
-
-const soundManager = new SoundManager();
-
 // Initialize Three.js Scene
 function initScene() {
+    console.log('Initializing scene...');
+    
     // Scene setup
     scene = new THREE.Scene();
     scene.fog = new THREE.Fog(0x0a0e27, 10, 50);
@@ -494,24 +356,24 @@ function initScene() {
         alpha: true
     });
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(window.devicePixelRatio);
-    renderer.toneMapping = THREE.ReinhardToneMapping;
-    renderer.toneMappingExposure = 2;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     document.getElementById('canvas-container').appendChild(renderer.domElement);
     
-    // Post-processing
-    setupPostProcessing();
-    
-    // Controls
-    controls = new THREE.OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.dampingFactor = 0.05;
-    controls.rotateSpeed = 0.5;
-    controls.zoomSpeed = 0.8;
-    controls.minDistance = 8;
-    controls.maxDistance = 30;
-    controls.autoRotate = settings.autoRotate;
-    controls.autoRotateSpeed = 0.5;
+    // Controls - Check if OrbitControls is available
+    if (typeof THREE.OrbitControls !== 'undefined') {
+        controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.rotateSpeed = 0.5;
+        controls.zoomSpeed = 0.8;
+        controls.minDistance = 8;
+        controls.maxDistance = 30;
+        controls.autoRotate = settings.autoRotate;
+        controls.autoRotateSpeed = 0.5;
+    } else {
+        console.warn('OrbitControls not loaded, using fallback controls');
+        setupFallbackControls();
+    }
     
     // Lighting
     setupLighting();
@@ -519,32 +381,40 @@ function initScene() {
     // Raycaster for mouse interaction
     raycaster = new THREE.Raycaster();
     mouse = new THREE.Vector2();
+    
+    console.log('Scene initialized successfully');
 }
 
-// Setup post-processing effects
-function setupPostProcessing() {
-    composer = new THREE.EffectComposer(renderer);
+// Fallback controls if OrbitControls fails to load
+function setupFallbackControls() {
+    let mouseX = 0, mouseY = 0;
+    let targetX = 0, targetY = 0;
     
-    const renderPass = new THREE.RenderPass(scene, camera);
-    composer.addPass(renderPass);
+    document.addEventListener('mousemove', (e) => {
+        mouseX = (e.clientX - window.innerWidth / 2) * 0.001;
+        mouseY = (e.clientY - window.innerHeight / 2) * 0.001;
+    });
     
-    const bloomPass = new THREE.UnrealBloomPass(
-        new THREE.Vector2(window.innerWidth, window.innerHeight),
-        0.5,  // Bloom strength
-        0.4,  // Bloom radius
-        0.85  // Bloom threshold
-    );
-    composer.addPass(bloomPass);
+    // Simple rotation in animate loop
+    window.fallbackAnimate = function() {
+        targetX = mouseX * 0.5;
+        targetY = mouseY * 0.5;
+        
+        if (scene) {
+            scene.rotation.y += (targetX - scene.rotation.y) * 0.05;
+            scene.rotation.x += (targetY - scene.rotation.x) * 0.05;
+        }
+    };
 }
 
 // Setup lighting
 function setupLighting() {
     // Ambient light
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
     scene.add(ambientLight);
     
     // Main directional light
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.6);
     directionalLight.position.set(10, 10, 5);
     scene.add(directionalLight);
     
@@ -556,20 +426,19 @@ function setupLighting() {
     const pointLight2 = new THREE.PointLight(0x764ba2, 0.5, 20);
     pointLight2.position.set(10, -5, -5);
     scene.add(pointLight2);
-    
-    // Animated point light
-    const movingLight = new THREE.PointLight(0xffffff, 0.3, 15);
-    scene.add(movingLight);
-    
-    // Store for animation
-    scene.userData.movingLight = movingLight;
 }
 
 // Create geodesic dome structure
 function createGeodesicDome() {
+    console.log('Creating geodesic dome...');
+    
     const radius = 6;
     const detail = 2;
     const geometry = new THREE.IcosahedronGeometry(radius, detail);
+    
+    // Create groups for organization
+    nodeGroup = new THREE.Group();
+    connectionGroup = new THREE.Group();
     
     // Create emotion nodes
     const positions = geometry.attributes.position;
@@ -590,32 +459,31 @@ function createGeodesicDome() {
         createEmotionNode(emotion, x, y, z);
     });
     
-    // Create connections
+    scene.add(nodeGroup);
+    
+    // Create connections after all nodes are created
     createConnections();
+    scene.add(connectionGroup);
     
     // Create particle system
     if (settings.particleEffects) {
         createParticles();
     }
     
-    // Update stats
-    updateStats();
+    console.log('Geodesic dome created successfully');
 }
 
 // Create individual emotion node
 function createEmotionNode(emotion, x, y, z) {
-    const nodeGroup = new THREE.Group();
+    const node = new THREE.Group();
     
     // Main sphere
     const sphereGeometry = new THREE.SphereGeometry(0.2 * settings.nodeSize, 32, 32);
-    const sphereMaterial = new THREE.MeshPhysicalMaterial({
+    const sphereMaterial = new THREE.MeshPhongMaterial({
         color: emotion.color,
         emissive: emotion.color,
         emissiveIntensity: 0.3,
-        metalness: 0.3,
-        roughness: 0.4,
-        clearcoat: 1,
-        clearcoatRoughness: 0.1
+        shininess: 100
     });
     const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
     
@@ -629,26 +497,26 @@ function createEmotionNode(emotion, x, y, z) {
     const glow = new THREE.Mesh(glowGeometry, glowMaterial);
     
     // Add to group
-    nodeGroup.add(sphere);
-    nodeGroup.add(glow);
-    nodeGroup.position.set(x, y, z);
-    nodeGroup.userData = emotion;
+    node.add(sphere);
+    node.add(glow);
+    node.position.set(x, y, z);
+    node.userData = emotion;
     
     // Create label
     if (settings.showLabels) {
-        createLabel(emotion.name, nodeGroup);
+        createLabel(emotion.name, node);
     }
     
     // Store reference
     emotionNodes.push({
-        group: nodeGroup,
+        group: node,
         sphere: sphere,
         glow: glow,
         emotion: emotion,
         originalPosition: new THREE.Vector3(x, y, z)
     });
     
-    scene.add(nodeGroup);
+    nodeGroup.add(node);
 }
 
 // Create text label for node
@@ -659,7 +527,7 @@ function createLabel(text, parentGroup) {
     canvas.height = 128;
     
     // Draw text
-    context.font = 'Bold 48px Inter';
+    context.font = 'Bold 48px Arial';
     context.fillStyle = 'white';
     context.textAlign = 'center';
     context.textBaseline = 'middle';
@@ -685,9 +553,7 @@ function createLabel(text, parentGroup) {
 
 // Create connections between emotions
 function createConnections() {
-    // Clear existing connections
-    connections.forEach(conn => scene.remove(conn.line));
-    connections = [];
+    console.log('Creating connections...');
     
     emotionNodes.forEach(nodeData => {
         const emotion = nodeData.emotion;
@@ -696,73 +562,57 @@ function createConnections() {
             const targetNode = emotionNodes.find(n => n.emotion.id === targetId);
             
             if (targetNode) {
-                // Create curved connection
-                const curve = new THREE.CatmullRomCurve3([
-                    nodeData.group.position,
-                    new THREE.Vector3(
-                        (nodeData.group.position.x + targetNode.group.position.x) / 2,
-                        (nodeData.group.position.y + targetNode.group.position.y) / 2 + 1,
-                        (nodeData.group.position.z + targetNode.group.position.z) / 2
-                    ),
-                    targetNode.group.position
+                // Create simple line connection
+                const geometry = new THREE.BufferGeometry();
+                const positions = new Float32Array([
+                    nodeData.group.position.x, nodeData.group.position.y, nodeData.group.position.z,
+                    targetNode.group.position.x, targetNode.group.position.y, targetNode.group.position.z
                 ]);
-                
-                const points = curve.getPoints(50);
-                const geometry = new THREE.BufferGeometry().setFromPoints(points);
+                geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
                 
                 const material = new THREE.LineBasicMaterial({
                     color: 0xffffff,
                     opacity: settings.connectionOpacity,
-                    transparent: true,
-                    linewidth: 1
+                    transparent: true
                 });
                 
                 const line = new THREE.Line(geometry, material);
                 line.userData = {
                     from: emotion,
-                    to: targetNode.emotion,
-                    fromNode: nodeData,
-                    toNode: targetNode
+                    to: targetNode.emotion
                 };
                 
                 connections.push({ line, material });
-                scene.add(line);
+                connectionGroup.add(line);
             }
         });
     });
+    
+    console.log(`Created ${connections.length} connections`);
 }
 
-// Create particle system for ambiance
+// Create particle system
 function createParticles() {
-    const particleCount = 1000;
+    const particleCount = 500; // Reduced for performance
     const geometry = new THREE.BufferGeometry();
     const positions = new Float32Array(particleCount * 3);
-    const colors = new Float32Array(particleCount * 3);
     
     for (let i = 0; i < particleCount; i++) {
         const i3 = i * 3;
-        
-        // Random position in sphere
+        const radius = 8 + Math.random() * 12;
         const theta = Math.random() * Math.PI * 2;
         const phi = Math.acos(2 * Math.random() - 1);
-        const radius = 8 + Math.random() * 12;
         
         positions[i3] = radius * Math.sin(phi) * Math.cos(theta);
         positions[i3 + 1] = radius * Math.sin(phi) * Math.sin(theta);
         positions[i3 + 2] = radius * Math.cos(phi);
-        
-        // Random color (purple to blue gradient)
-        colors[i3] = 0.4 + Math.random() * 0.3;
-        colors[i3 + 1] = 0.3 + Math.random() * 0.3;
-        colors[i3 + 2] = 0.9 + Math.random() * 0.1;
     }
     
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     
     const material = new THREE.PointsMaterial({
         size: 0.05,
-        vertexColors: true,
+        color: 0x667eea,
         transparent: true,
         opacity: 0.6,
         blending: THREE.AdditiveBlending
@@ -776,87 +626,36 @@ function createParticles() {
 function onMouseMove(event) {
     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-    
-    raycaster.setFromCamera(mouse, camera);
-    const intersects = raycaster.intersectObjects(
-        emotionNodes.map(n => n.sphere)
-    );
-    
-    if (intersects.length > 0) {
-        const intersectedNode = emotionNodes.find(
-            n => n.sphere === intersects[0].object
-        );
-        
-        if (hoveredNode !== intersectedNode) {
-            // Reset previous hover
-            if (hoveredNode) {
-                gsap.to(hoveredNode.group.scale, {
-                    x: 1, y: 1, z: 1,
-                    duration: 0.3,
-                    ease: "power2.out"
-                });
-            }
-            
-            // Apply hover effect
-            hoveredNode = intersectedNode;
-            gsap.to(hoveredNode.group.scale, {
-                x: 1.3, y: 1.3, z: 1.3,
-                duration: 0.3,
-                ease: "power2.out"
-            });
-            
-            // Play hover sound
-            soundManager.playHover();
-            
-            // Update info panel
-            updateInfoPanel(hoveredNode.emotion);
-            
-            // Highlight connections
-            highlightConnections(hoveredNode.emotion);
-        }
-    } else {
-        if (hoveredNode && hoveredNode !== selectedNode) {
-            gsap.to(hoveredNode.group.scale, {
-                x: 1, y: 1, z: 1,
-                duration: 0.3,
-                ease: "power2.out"
-            });
-            hoveredNode = null;
-            
-            if (!selectedNode) {
-                hideInfoPanel();
-                resetConnections();
-            }
-        }
-    }
 }
 
 // Handle mouse click
 function onMouseClick(event) {
-    if (hoveredNode) {
-        selectedNode = hoveredNode;
-        soundManager.playClick();
+    raycaster.setFromCamera(mouse, camera);
+    const intersects = raycaster.intersectObjects(nodeGroup.children, true);
+    
+    if (intersects.length > 0) {
+        const clickedObject = intersects[0].object;
+        const nodeData = emotionNodes.find(n => 
+            n.sphere === clickedObject || n.glow === clickedObject
+        );
         
-        // Focus camera on node
-        const targetPosition = hoveredNode.group.position.clone();
-        gsap.to(controls.target, {
-            x: targetPosition.x,
-            y: targetPosition.y,
-            z: targetPosition.z,
-            duration: 1,
-            ease: "power2.inOut"
-        });
-        
-        // Keep info panel visible
-        updateInfoPanel(selectedNode.emotion);
-    } else {
-        selectedNode = null;
+        if (nodeData) {
+            selectNode(nodeData);
+        }
     }
 }
 
-// Update info panel with emotion data
+// Select a node
+function selectNode(nodeData) {
+    appState.selectedNode = nodeData;
+    updateInfoPanel(nodeData.emotion);
+    highlightConnections(nodeData.emotion);
+}
+
+// Update info panel
 function updateInfoPanel(emotion) {
     const panel = document.getElementById('infoPanel');
+    if (!panel) return;
     
     document.getElementById('emotionName').textContent = emotion.name;
     document.getElementById('emotionDesc').textContent = emotion.desc;
@@ -867,108 +666,132 @@ function updateInfoPanel(emotion) {
     
     // Update connections list
     const connectionsList = document.getElementById('connectionsList');
-    connectionsList.innerHTML = emotion.connections
-        .map(connId => {
-            const connEmotion = emotionsData.find(e => e.id === connId);
-            return `<span class="connection-tag">${connEmotion.name}</span>`;
-        })
-        .join('');
+    if (connectionsList) {
+        connectionsList.innerHTML = emotion.connections
+            .map(connId => {
+                const connEmotion = emotionsData.find(e => e.id === connId);
+                return connEmotion ? `<span class="connection-tag">${connEmotion.name}</span>` : '';
+            })
+            .join('');
+    }
     
     panel.classList.add('visible');
 }
 
-// Hide info panel
-function hideInfoPanel() {
-    document.getElementById('infoPanel').classList.remove('visible');
-}
-
-// Highlight connections for an emotion
+// Highlight connections
 function highlightConnections(emotion) {
     connections.forEach(conn => {
-        if (conn.line.userData.from === emotion || 
-            conn.line.userData.to === emotion) {
-            gsap.to(conn.material, {
-                opacity: 0.8,
-                duration: 0.3
-            });
+        if (conn.line.userData.from === emotion || conn.line.userData.to === emotion) {
+            conn.material.opacity = 0.8;
             conn.material.color = new THREE.Color(emotion.color);
         } else {
-            gsap.to(conn.material, {
-                opacity: 0.1,
-                duration: 0.3
-            });
+            conn.material.opacity = 0.1;
         }
     });
 }
 
-// Reset connection highlighting
+// Reset connections
 function resetConnections() {
     connections.forEach(conn => {
-        gsap.to(conn.material, {
-            opacity: settings.connectionOpacity,
-            duration: 0.3
-        });
+        conn.material.opacity = settings.connectionOpacity;
         conn.material.color = new THREE.Color(0xffffff);
     });
 }
 
 // Filter by category
 function filterByCategory(category) {
-    selectedCategory = category;
+    appState.selectedCategory = category;
     
     emotionNodes.forEach(nodeData => {
         if (category === 'all' || nodeData.emotion.category === category) {
-            gsap.to(nodeData.sphere.material, {
-                opacity: 1,
-                duration: 0.5
-            });
+            nodeData.sphere.material.opacity = 1;
             if (nodeData.group.userData.label) {
-                gsap.to(nodeData.group.userData.label.material, {
-                    opacity: 0.9,
-                    duration: 0.5
-                });
+                nodeData.group.userData.label.material.opacity = 0.9;
             }
         } else {
-            gsap.to(nodeData.sphere.material, {
-                opacity: 0.2,
-                duration: 0.5
-            });
+            nodeData.sphere.material.opacity = 0.2;
             if (nodeData.group.userData.label) {
-                gsap.to(nodeData.group.userData.label.material, {
-                    opacity: 0.2,
-                    duration: 0.5
-                });
+                nodeData.group.userData.label.material.opacity = 0.2;
             }
-        }
-    });
-    
-    // Update connections
-    connections.forEach(conn => {
-        const fromMatch = category === 'all' || conn.line.userData.from.category === category;
-        const toMatch = category === 'all' || conn.line.userData.to.category === category;
-        
-        if (fromMatch || toMatch) {
-            gsap.to(conn.material, {
-                opacity: settings.connectionOpacity,
-                duration: 0.5
-            });
-        } else {
-            gsap.to(conn.material, {
-                opacity: 0.05,
-                duration: 0.5
-            });
         }
     });
     
     // Update active category display
-    document.getElementById('activeCategory').textContent = 
-        category === 'all' ? 'All' : category.charAt(0).toUpperCase() + category.slice(1);
+    const activeCategoryElement = document.getElementById('activeCategory');
+    if (activeCategoryElement) {
+        activeCategoryElement.textContent = 
+            category === 'all' ? 'All' : category.charAt(0).toUpperCase() + category.slice(1);
+    }
 }
 
-// Update statistics display
-function updateStats() {
-    document.getElementById('totalNodes').textContent = emotionNodes.length;
-    document.getElementById('totalConnections').textContent = connections.length;
+// Initialize UI controls
+function initUIControls() {
+    console.log('Initializing UI controls...');
+    
+    // Category filters
+    document.querySelectorAll('.emotion-category').forEach(element => {
+        element.addEventListener('click', function() {
+            document.querySelectorAll('.emotion-category').forEach(el => {
+                el.classList.remove('active');
+            });
+            this.classList.add('active');
+            const category = this.dataset.category;
+            filterByCategory(category);
+        });
+    });
+    
+    // Reset view button
+    const resetBtn = document.getElementById('resetView');
+    if (resetBtn) {
+        resetBtn.addEventListener('click', () => {
+            if (controls) {
+                controls.reset();
+            }
+            camera.position.set(0, 0, 15);
+            appState.selectedNode = null;
+            document.getElementById('infoPanel')?.classList.remove('visible');
+            resetConnections();
+        });
+    }
+    
+    // Settings modal
+    const settingsModal = document.getElementById('settingsModal');
+    const toggleSettings = document.getElementById('toggleSettings');
+    const closeSettings = document.getElementById('closeSettings');
+    
+    if (toggleSettings && settingsModal) {
+        toggleSettings.addEventListener('click', () => {
+            settingsModal.classList.add('active');
+        });
+    }
+    
+    if (closeSettings && settingsModal) {
+        closeSettings.addEventListener('click', () => {
+            settingsModal.classList.remove('active');
+        });
+    }
+    
+    // Close info panel
+    const closeInfo = document.getElementById('closeInfo');
+    if (closeInfo) {
+        closeInfo.addEventListener('click', () => {
+            appState.selectedNode = null;
+            document.getElementById('infoPanel')?.classList.remove('visible');
+            resetConnections();
+        });
+    }
+    
+    // Welcome modal
+    const welcomeModal = document.getElementById('welcomeModal');
+    const startButton = document.getElementById('startExperience');
+    
+    if (startButton && welcomeModal) {
+        startButton.addEventListener('click', () => {
+            welcomeModal.classList.remove('active');
+        });
+    }
+    
+    console.log('UI controls initialized');
 }
 
 // Animation loop
@@ -976,19 +799,25 @@ function animate() {
     requestAnimationFrame(animate);
     
     // Update controls
-    controls.update();
+    if (controls && controls.update) {
+        controls.update();
+    }
+    
+    // Fallback animation
+    if (window.fallbackAnimate) {
+        window.fallbackAnimate();
+    }
     
     // Animate nodes
     const time = Date.now() * 0.001;
     emotionNodes.forEach((nodeData, index) => {
-        if (nodeData !== hoveredNode && nodeData !== selectedNode) {
-            const pulseScale = 1 + Math.sin(time * settings.animationSpeed + index) * 0.05;
-            nodeData.glow.scale.set(pulseScale, pulseScale, pulseScale);
-        }
+        // Gentle floating animation
+        const floatY = Math.sin(time * 0.5 + index) * 0.05;
+        nodeData.group.position.y = nodeData.originalPosition.y + floatY;
         
-        // Float animation
-        nodeData.group.position.y = 
-            nodeData.originalPosition.y + Math.sin(time * 0.5 + index) * 0.1;
+        // Gentle pulse for glow
+        const pulseScale = 1 + Math.sin(time * settings.animationSpeed + index) * 0.05;
+        nodeData.glow.scale.set(pulseScale, pulseScale, pulseScale);
     });
     
     // Animate particles
@@ -996,481 +825,98 @@ function animate() {
         particles.rotation.y += 0.0002;
     }
     
-    // Animate moving light
-    if (scene.userData.movingLight) {
-        scene.userData.movingLight.position.x = Math.sin(time * 0.5) * 10;
-        scene.userData.movingLight.position.y = Math.cos(time * 0.3) * 10;
-        scene.userData.movingLight.position.z = Math.sin(time * 0.7) * 10;
-    }
-    
     // Render scene
-    composer.render();
+    if (renderer && scene && camera) {
+        renderer.render(scene, camera);
+    }
 }
 
 // Handle window resize
 function onWindowResize() {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    composer.setSize(window.innerWidth, window.innerHeight);
+    if (camera && renderer) {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    }
 }
 
-// Initialize UI controls
-function initUIControls() {
-    // Category filters
-    document.querySelectorAll('.emotion-category').forEach(element => {
-        element.addEventListener('click', function() {
-            // Remove active class from all
-            document.querySelectorAll('.emotion-category').forEach(el => {
-                el.classList.remove('active');
-            });
-            
-            // Add active class to clicked
-            this.classList.add('active');
-            
-            // Apply filter
-            const category = this.dataset.category;
-            filterByCategory(category);
-        });
-    });
+// Hide loader with proper timing
+function hideLoader() {
+    const loader = document.getElementById('loader');
+    if (!loader) return;
     
-    // Reset view button
-    document.getElementById('resetView').addEventListener('click', () => {
-        gsap.to(controls.target, {
-            x: 0, y: 0, z: 0,
-            duration: 1,
-            ease: "power2.inOut"
-        });
-        
-        gsap.to(camera.position, {
-            x: 0, y: 0, z: 15,
-            duration: 1,
-            ease: "power2.inOut"
-        });
-        
-        selectedNode = null;
-        hideInfoPanel();
-        resetConnections();
-    });
-    
-    // Settings modal
-    const settingsModal = document.getElementById('settingsModal');
-    
-    document.getElementById('toggleSettings').addEventListener('click', () => {
-        settingsModal.classList.add('active');
-    });
-    
-    document.getElementById('closeSettings').addEventListener('click', () => {
-        settingsModal.classList.remove('active');
-    });
-    
-    // Settings controls
-    document.getElementById('animationSpeed').addEventListener('input', function() {
-        settings.animationSpeed = this.value / 100;
-        this.nextElementSibling.textContent = this.value + '%';
-    });
-    
-    document.getElementById('connectionOpacity').addEventListener('input', function() {
-        settings.connectionOpacity = this.value / 100;
-        this.nextElementSibling.textContent = this.value + '%';
-        connections.forEach(conn => {
-            conn.material.opacity = settings.connectionOpacity;
-        });
-    });
-    
-    document.getElementById('nodeSize').addEventListener('input', function() {
-        settings.nodeSize = this.value / 100;
-        this.nextElementSibling.textContent = this.value + '%';
-        emotionNodes.forEach(nodeData => {
-            const scale = settings.nodeSize;
-            nodeData.sphere.scale.set(scale, scale, scale);
-            nodeData.glow.scale.set(scale * 1.25, scale * 1.25, scale * 1.25);
-        });
-    });
-    
-    document.getElementById('showLabels').addEventListener('change', function() {
-        settings.showLabels = this.checked;
-        emotionNodes.forEach(nodeData => {
-            if (nodeData.group.userData.label) {
-                nodeData.group.userData.label.visible = settings.showLabels;
-            }
-        });
-    });
-    
-    document.getElementById('autoRotate').addEventListener('change', function() {
-        settings.autoRotate = this.checked;
-        controls.autoRotate = settings.autoRotate;
-    });
-    
-    document.getElementById('particleEffects').addEventListener('change', function() {
-        settings.particleEffects = this.checked;
-        if (particles) {
-            particles.visible = settings.particleEffects;
-        }
-    });
-    
-    // Sound toggle
-    document.getElementById('toggleSound').addEventListener('click', function() {
-        settings.soundEnabled = !settings.soundEnabled;
-        this.classList.toggle('active');
-        const icon = this.querySelector('i');
-        icon.className = settings.soundEnabled ? 'fas fa-volume-up' : 'fas fa-volume-mute';
-        soundManager.toggleAmbient(settings.soundEnabled);
-    });
-    
-    // Fullscreen toggle
-    document.getElementById('toggleFullscreen').addEventListener('click', () => {
-        if (!document.fullscreenElement) {
-            document.documentElement.requestFullscreen();
-        } else {
-            document.exitFullscreen();
-        }
-    });
-    
-    // Close info panel
-    document.getElementById('closeInfo').addEventListener('click', () => {
-        selectedNode = null;
-        hideInfoPanel();
-        resetConnections();
-    });
+    // Ensure minimum loading time for smooth transition
+    setTimeout(() => {
+        loader.style.opacity = '0';
+        setTimeout(() => {
+            loader.style.display = 'none';
+            loader.classList.add('hidden');
+            appState.isLoading = false;
+            console.log('Loader hidden');
+        }, 500);
+    }, 1000);
 }
 
-// Initialize application with enhanced error handling
-async function init() {
+// Main initialization function
+function init() {
+    console.log('Starting initialization...');
+    
     try {
-        // Show welcome modal for first-time visitors
-        if (stateManager.getState('isFirstVisit')) {
-            showWelcomeModal();
-        }
-        
-        // Load saved state
-        stateManager.loadFromLocalStorage();
-        
         // Initialize Three.js scene
-        await initScene();
+        initScene();
         
         // Create dome structure
-        await createGeodesicDome();
+        createGeodesicDome();
         
         // Initialize UI controls
         initUIControls();
         
-        // Setup keyboard shortcuts
-        setupKeyboardShortcuts();
-        
-        // Setup search functionality
-        setupSearch();
-        
-        // Initialize tooltips
-        initTooltips();
-        
-        // Event listeners
-        setupEventListeners();
-        
-        // Start performance monitoring
-        if (settings.showPerformance) {
-            startPerformanceMonitoring();
-        }
-        
-        // Hide loader with animation
-        hideLoader();
+        // Setup event listeners
+        window.addEventListener('resize', onWindowResize);
+        window.addEventListener('mousemove', onMouseMove);
+        window.addEventListener('click', onMouseClick);
         
         // Start animation loop
         animate();
         
-        // Play ambient sound if enabled
-        if (settings.soundEnabled) {
-            soundManager.toggleAmbient(true);
-        }
+        // Hide loader after everything is ready
+        hideLoader();
         
-        // Analytics
-        trackEvent('app_initialized', {
-            nodes: emotionNodes.length,
-            connections: connections.length
-        });
+        console.log('Initialization complete!');
         
     } catch (error) {
-        console.error('Failed to initialize application:', error);
-        showErrorMessage('Failed to load the Emotion Dome. Please refresh the page.');
-    }
-}
-
-// Enhanced keyboard shortcuts
-function setupKeyboardShortcuts() {
-    const shortcuts = {
-        'Escape': () => {
-            stateManager.setState({ selectedNode: null });
-            resetView();
-        },
-        'Space': (e) => {
-            e.preventDefault();
-            settings.autoRotate = !settings.autoRotate;
-            controls.autoRotate = settings.autoRotate;
-        },
-        'KeyF': (e) => {
-            if (!e.ctrlKey && !e.metaKey) {
-                toggleFullscreen();
-            }
-        },
-        'KeyS': () => {
-            settings.soundEnabled = !settings.soundEnabled;
-            updateSoundButton();
-        },
-        'KeyH': () => {
-            showHelp();
-        },
-        'KeyR': () => {
-            resetView();
-        },
-        'Slash': (e) => {
-            e.preventDefault();
-            document.getElementById('emotionSearch').focus();
-        },
-        'ArrowLeft': () => navigateCategory(-1),
-        'ArrowRight': () => navigateCategory(1),
-        'KeyZ': (e) => {
-            if (e.ctrlKey || e.metaKey) {
-                e.preventDefault();
-                stateManager.undo();
-            }
-        },
-        'Digit1': () => filterByCategory('all'),
-        'Digit2': () => filterByCategory('joy'),
-        'Digit3': () => filterByCategory('love'),
-        'Digit4': () => filterByCategory('sadness'),
-        'Digit5': () => filterByCategory('anger'),
-        'Digit6': () => filterByCategory('fear'),
-        'Digit7': () => filterByCategory('calm')
-    };
-    
-    document.addEventListener('keydown', (e) => {
-        if (shortcuts[e.code]) {
-            shortcuts[e.code](e);
-        }
-    });
-}
-
-// Navigate between categories with keyboard
-function navigateCategory(direction) {
-    const categories = ['all', 'joy', 'love', 'sadness', 'anger', 'fear', 'calm'];
-    const currentIndex = categories.indexOf(stateManager.getState('selectedCategory'));
-    const newIndex = (currentIndex + direction + categories.length) % categories.length;
-    filterByCategory(categories[newIndex]);
-}
-
-// Enhanced search functionality
-function setupSearch() {
-    const searchInput = document.getElementById('emotionSearch');
-    let searchTimeout;
-    
-    searchInput.addEventListener('input', (e) => {
-        clearTimeout(searchTimeout);
-        const query = e.target.value.toLowerCase();
+        console.error('Initialization error:', error);
         
-        searchTimeout = setTimeout(() => {
-            performSearch(query);
-        }, 300); // Debounce search
-    });
-    
-    searchInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-            const results = performSearch(searchInput.value.toLowerCase());
-            if (results.length > 0) {
-                focusOnNode(results[0]);
+        // Show error message to user
+        const loader = document.getElementById('loader');
+        if (loader) {
+            const loaderText = loader.querySelector('.loader-text');
+            if (loaderText) {
+                loaderText.textContent = 'Error loading application. Please refresh.';
+                loaderText.style.color = '#f56565';
             }
         }
-    });
-}
-
-// Perform emotion search
-function performSearch(query) {
-    stateManager.setState({ searchQuery: query });
-    
-    if (!query) {
-        // Reset all nodes visibility
-        emotionNodes.forEach(node => {
-            gsap.to(node.sphere.material, {
-                opacity: 1,
-                duration: 0.3
-            });
-        });
-        return [];
-    }
-    
-    const results = [];
-    
-    emotionNodes.forEach(node => {
-        const emotion = node.emotion;
-        const match = 
-            emotion.name.toLowerCase().includes(query) ||
-            emotion.desc.toLowerCase().includes(query) ||
-            emotion.keywords.some(k => k.includes(query)) ||
-            emotion.category.includes(query);
-        
-        if (match) {
-            results.push(node);
-            gsap.to(node.sphere.material, {
-                opacity: 1,
-                duration: 0.3
-            });
-            // Pulse effect for matches
-            gsap.to(node.group.scale, {
-                x: 1.2,
-                y: 1.2,
-                z: 1.2,
-                duration: 0.5,
-                yoyo: true,
-                repeat: 1
-            });
-        } else {
-            gsap.to(node.sphere.material, {
-                opacity: 0.2,
-                duration: 0.3
-            });
-        }
-    });
-    
-    updateSearchResults(results);
-    return results;
-}
-
-// Update search results display
-function updateSearchResults(results) {
-    const resultsContainer = document.getElementById('searchResults');
-    if (!resultsContainer) return;
-    
-    if (results.length === 0 && stateManager.getState('searchQuery')) {
-        resultsContainer.innerHTML = '<p class="no-results">No emotions found</p>';
-    } else if (results.length > 0) {
-        resultsContainer.innerHTML = `
-            <p class="results-count">${results.length} emotion${results.length > 1 ? 's' : ''} found</p>
-            <div class="results-list">
-                ${results.map(node => `
-                    <div class="result-item" data-id="${node.emotion.id}">
-                        <span class="result-name">${node.emotion.name}</span>
-                        <span class="result-category">${node.emotion.category}</span>
-                    </div>
-                `).join('')}
-            </div>
-        `;
-        
-        // Add click handlers to results
-        resultsContainer.querySelectorAll('.result-item').forEach(item => {
-            item.addEventListener('click', () => {
-                const nodeId = item.dataset.id;
-                const node = emotionNodes.find(n => n.emotion.id === nodeId);
-                if (node) focusOnNode(node);
-            });
-        });
-    } else {
-        resultsContainer.innerHTML = '';
     }
 }
 
-// Initialize tooltips using Tippy.js
-function initTooltips() {
-    // Category tooltips
-    tippy('.emotion-category', {
-        content: (element) => {
-            const category = element.dataset.category;
-            const count = element.querySelector('.category-count').textContent;
-            return `Click to filter by ${category} emotions (${count})`;
-        },
-        placement: 'right',
-        theme: 'light'
-    });
-    
-    // Control button tooltips
-    tippy('#toggleSound', {
-        content: 'Toggle sound (S)',
-        placement: 'bottom'
-    });
-    
-    tippy('#toggleFullscreen', {
-        content: 'Fullscreen (F)',
-        placement: 'bottom'
-    });
-    
-    tippy('#toggleSettings', {
-        content: 'Settings',
-        placement: 'bottom'
-    });
-    
-    tippy('#resetView', {
-        content: 'Reset view (R)',
-        placement: 'top'
-    });
+// Start when DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+} else {
+    // DOM is already loaded
+    init();
 }
 
-// Enhanced loader hiding with progress animation
-function hideLoader() {
-    const loader = document.getElementById('loader');
-    const progressBar = loader.querySelector('.loader-progress-bar');
-    const percentage = loader.querySelector('.loader-percentage');
-    
-    // Animate progress to 100%
-    gsap.to(progressBar, {
-        width: '100%',
-        duration: 1,
-        ease: 'power2.out',
-        onUpdate: function() {
-            const progress = Math.round(this.progress() * 100);
-            if (percentage) {
-                percentage.textContent = `${progress}%`;
-            }
-        },
-        onComplete: () => {
-            // Fade out loader
-            gsap.to(loader, {
-                opacity: 0,
-                duration: 0.5,
-                onComplete: () => {
-                    loader.classList.add('hidden');
-                    stateManager.setState({ isLoading: false });
-                }
-            });
-        }
-    });
-}
-
-// Show welcome modal
-function showWelcomeModal() {
-    const modal = document.getElementById('welcomeModal');
-    if (!modal) return;
-    
-    modal.classList.add('active');
-    
-    document.getElementById('startExperience').addEventListener('click', () => {
-        modal.classList.remove('active');
-        trackEvent('welcome_completed');
-    });
-}
-
-// Analytics tracking
-function trackEvent(eventName, data = {}) {
-    // Implement your analytics tracking here
-    console.log('Track event:', eventName, data);
-    
-    // Example: Google Analytics
-    if (typeof gtag !== 'undefined') {
-        gtag('event', eventName, data);
+// Export for debugging
+window.debugEmotionDome = {
+    scene,
+    camera,
+    renderer,
+    emotionNodes,
+    connections,
+    appState,
+    settings,
+    resetScene: () => {
+        location.reload();
     }
-}
-
-// Error handling
-function showErrorMessage(message) {
-    const errorDiv = document.createElement('div');
-    errorDiv.className = 'error-message';
-    errorDiv.innerHTML = `
-        <i class="fas fa-exclamation-triangle"></i>
-        <span>${message}</span>
-    `;
-    document.body.appendChild(errorDiv);
-    
-    setTimeout(() => {
-        errorDiv.remove();
-    }, 5000);
-}
-
-// Start application when DOM is loaded
-document.addEventListener('DOMContentLoaded', init);
+};
